@@ -1,0 +1,30 @@
+# 统一行尾策略 —— 本项目跨平台协作：
+#   Windows 开发（No.2 宿主）+ macOS 打包 iOS（No.1 宿主）
+# 不统一的话，Mac 侧会出现满屏"仅行尾不同"的噪音 diff，把真实改动淹掉。
+
+* text=auto eol=lf
+
+# 二进制资源（禁止任何转换）
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.webp  binary
+*.ogg   binary
+*.wav   binary
+*.mp3   binary
+*.ttf   binary
+*.ttc   binary
+*.otf   binary
+*.exe   binary
+
+# Godot 资源文本文件（保持 LF，与引擎一致）
+*.tscn  text eol=lf
+*.tres  text eol=lf
+*.godot text eol=lf
+*.gd    text eol=lf
+*.import text eol=lf
+
+# Windows 脚本（必须 CRLF，否则 cmd 解析异常）
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+*.ps1  text eol=crlf
