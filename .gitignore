@@ -1,0 +1,17 @@
+﻿# ===== 通用 =====
+.idea/
+.vscode/
+*.log
+.DS_Store
+Thumbs.db
+node_modules/
+__pycache__/
+*.pyc
+
+# ===== Godot（候选技术栈，确定后取消注释并保留）=====
+# .godot/
+# export/
+# *.import
+# .mono/
+
+# ===== 其他技术栈确定后补全 =====
