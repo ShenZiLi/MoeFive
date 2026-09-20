@@ -19,17 +19,47 @@
 > ⚠️ **iOS 打包需 macOS + Xcode**，Windows 出不了 IPA。
 > 📌 **不复用 MoeChess 的技术与资产**，独立立项；仅保留 Moe 系列的命名与调性归属。
 
-## 目录规划（待 M1 随 Godot 骨架定稿）
-- `res://scenes/` 场景（主页 / 难度选择 / 对局 / 结算）
-- `res://scripts/` GDScript（棋盘状态机 / 胜负判定 / 悔棋栈 / AI）
-- `res://assets/` 萌系美术与音频资源
-- `docs/` 设计文档（`需求文档.md` / `技术选型评估.md` / `原型图.png`）
+## 目录结构
+```
+project.godot            引擎配置（Compatibility 渲染器，1280×720）
+main.tscn                入口场景
+scripts/
+  GameConfig.gd          全局常量：棋盘 / 配色 / 难度参数 / 文案表
+  Board.gd               棋盘状态机（落子 · 胜负判定 · 悔棋完整回滚）
+  AIPlayer.gd            三档难度 AI（共享评估函数，仅参数区分）
+  BoardView.gd           棋盘视图（程序化绘制，不依赖美术资源）
+  Main.gd                主流程状态机（主页 / 难度 / 对局 / 结算）
+tests/
+  test_core.gd           核心逻辑自测（65 项断言）
+  test_smoke.gd          主场景加载冒烟测试
+docs/                    设计文档（.gdignore 已屏蔽，Godot 不扫描）
+```
+
+## 开发
+
+**运行游戏**（需 Godot 4.7.2；本机装于 `C:\Dev\godot`）
+```bash
+"C:/Dev/godot/Godot_v4.7.2-stable_win64.exe" --path .
+```
+
+**跑测试**（无界面，CI 友好）
+```bash
+G="C:/Dev/godot/Godot_v4.7.2-stable_win64_console.exe"
+"$G" --headless --path . --import                    # 首次：生成全局类缓存
+"$G" --headless --path . --script res://tests/test_core.gd
+"$G" --headless --path . --script res://tests/test_smoke.gd
+```
+
+> ⚠️ 新增 `class_name` 脚本后必须重跑 `--import`，否则全局类无法解析。
+>
+> ⚠️ **中文字体目前加载系统字体**（`C:/Windows/Fonts/msyh.ttc`）—— 仅作 M1 占位，
+> 打包前必须内嵌一款**授权可商用**的中文字体（影响需求 §9 的体积预算，M4 决策）。
 
 ## 进度
 - [x] 仓库初始化（2026-09-20）
-- [x] 需求基线 `docs/需求文档.md` v0.2（2026-09-20）
+- [x] 需求基线 `docs/需求文档.md` v0.2 · 全部决策点拍板（2026-09-20）
 - [x] 技术栈选型：Godot 4.7.2 + GDScript + Compatibility（2026-09-20）
-- [ ] M1 核心对局逻辑（双人 / 人机 / 悔棋 / 认输）
+- [x] **M1 核心对局逻辑**（双人 / 人机三档 / 无限悔棋 / 认输）— 自测 65/65 通过
 - [ ] M2 萌系角色与主视觉
 - [ ] M3 动效与音效注入
 - [ ] M4 六端打包
