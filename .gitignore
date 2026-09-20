@@ -8,10 +8,19 @@ node_modules/
 __pycache__/
 *.pyc
 
-# ===== Godot（候选技术栈，确定后取消注释并保留）=====
-# .godot/
-# export/
-# *.import
-# .mono/
+# ===== Godot 4.7.2（技术栈已定稿 2026-09-20）=====
+.godot/
+android/
+export/
+export_presets.cfg
+.mono/
+data_*/
+mono_crash.*.json
 
-# ===== 其他技术栈确定后补全 =====
+# 注：`*.import` 不在忽略之列 —— 它是 Godot 的资源导入配置，
+# 属于应当入库的项目数据，忽略它会导致他人克隆后资源导入设置丢失。
+# 注：`export_presets.cfg` 默认忽略 —— 其中含 Android keystore 路径与口令，
+# 若日后需要共享导出配置，请先改用环境变量承载签名口令再解除忽略。
+
+# ===== AI 工作目录（记忆与工具数据，不入库）=====
+.workbuddy/
