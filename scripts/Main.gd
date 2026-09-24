@@ -28,7 +28,9 @@ var _card_p1: PanelContainer
 var _card_p2: PanelContainer
 var _count_p1: Label
 var _count_p2: Label
-var _btn_undo: Button
+var _btn_undo: BaseButton
+var _actions: Control
+var _hud: CanvasLayer
 var _modal: Control
 var _ai_busy := false
 var _ai_timer: Timer
@@ -48,21 +50,31 @@ func _ready() -> void:
 
 # ========== 主题与中文字体 ==========
 
-## M1 占位：加载系统中文（Godot 内置默认字体不含 CJK）。
-## ⚠️ 打包前必须内嵌一款**授权可商用**的中文字体（M4 决策，见需求 §9 体积预算）。
+## 项目内置 ZCOOL KuaiLe（OFL-1.1）：圆润手写感适合萌宠、木质、黏土视觉。
+## 系统字体仅作为开发环境里的兼容回退，发布包不再依赖机器字库。
 func _load_cjk_font() -> Font:
+	var bundled_font := "res://assets/fonts/ZCOOLKuaiLe-Regular.ttf"
+	if FileAccess.file_exists(bundled_font):
+		var bundled := FontFile.new()
+		if bundled.load_dynamic_font(bundled_font) == OK:
+			print("MoeFive: UI 字体 -> ZCOOL KuaiLe（项目内置，OFL-1.1）")
+			return bundled
+
 	var candidates := [
 		"C:/Windows/Fonts/msyh.ttc",
 		"C:/Windows/Fonts/simhei.ttf",
 		"C:/Windows/Fonts/simsun.ttc",
 		"/System/Library/Fonts/PingFang.ttc",
+		"/System/Library/Fonts/STHeiti Medium.ttc",
+		"/System/Library/Fonts/STHeiti Light.ttc",
+		"/System/Library/Fonts/Hiragino Sans GB.ttc",
 		"/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
 	]
 	for p in candidates:
 		if FileAccess.file_exists(p):
 			var f := FontFile.new()
 			if f.load_dynamic_font(p) == OK:
-				print("MoeFive: UI 字体 -> %s（占位，打包前需内嵌可商用字体）" % p)
+				print("MoeFive: UI 字体 -> %s（开发环境回退）" % p)
 				return f
 	push_warning("MoeFive: 未找到中文字体，中文可能显示异常")
 	return null
@@ -83,8 +95,10 @@ func _make_button(text: String, bg: Color, min_w := 200.0) -> Button:
 	var b := Button.new()
 	b.text = text
 	b.custom_minimum_size = Vector2(min_w, 52)
-	b.add_theme_font_size_override("font_size", 20)
+	b.add_theme_font_size_override("font_size", 22)
+	b.add_theme_constant_override("outline_size", 2)
 	b.add_theme_color_override("font_color", GameConfig.C_TEXT_INV)
+	b.add_theme_color_override("font_outline_color", Color(GameConfig.C_TEXT, 0.28))
 	b.add_theme_color_override("font_hover_color", GameConfig.C_TEXT_INV)
 	b.add_theme_color_override("font_pressed_color", GameConfig.C_TEXT_INV)
 	b.add_theme_color_override("font_disabled_color", Color(1, 1, 1, 0.45))
@@ -123,7 +137,9 @@ func _make_label(text: String, fs: int, col: Color) -> Label:
 	var l := Label.new()
 	l.text = text
 	l.add_theme_font_size_override("font_size", fs)
+	l.add_theme_constant_override("outline_size", 1)
 	l.add_theme_color_override("font_color", col)
+	l.add_theme_color_override("font_outline_color", Color(GameConfig.C_TEXT, 0.18))
 	return l
 
 
@@ -164,6 +180,10 @@ func _clear_layer() -> void:
 	_count_p1 = null
 	_count_p2 = null
 	_btn_undo = null
+	_actions = null
+	if _hud != null and is_instance_valid(_hud):
+		_hud.queue_free()
+	_hud = null
 
 
 # ========== 背景 ==========
@@ -183,31 +203,123 @@ func _show_home() -> void:
 	_screen = Screen.HOME
 	_clear_layer()
 
-	_layer = CenterContainer.new()
+	# 首页采用分层美术：背景、角色、标题牌和交互卡片彼此独立，
+	# 方便后续替换单层资源，不再把首页视觉全部依赖于程序化渐变。
+	_layer = Control.new()
 	_layer.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_layer)
 
+	var bg := TextureRect.new()
+	bg.texture = load("res://assets/home/home_background.png")
+	bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_layer.add_child(bg)
+
+	var shade := ColorRect.new()
+	shade.color = Color(0.30, 0.19, 0.11, 0.10)
+	shade.set_anchors_preset(Control.PRESET_FULL_RECT)
+	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_layer.add_child(shade)
+
+	var dog := TextureRect.new()
+	dog.texture = load("res://assets/home/dog_home.png")
+	dog.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	dog.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	dog.anchor_left = 0.02
+	dog.anchor_right = 0.27
+	dog.anchor_top = 0.52
+	dog.anchor_bottom = 0.99
+	dog.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_layer.add_child(dog)
+
+	var cat := TextureRect.new()
+	cat.texture = load("res://assets/home/cat_home.png")
+	cat.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	cat.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	cat.anchor_left = 0.73
+	cat.anchor_right = 0.98
+	cat.anchor_top = 0.52
+	cat.anchor_bottom = 0.99
+	cat.flip_h = true
+	cat.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_layer.add_child(cat)
+
+	var plaque := TextureRect.new()
+	plaque.texture = load("res://assets/home/title_plaque.png")
+	plaque.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	plaque.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	plaque.anchor_left = 0.5
+	plaque.anchor_right = 0.5
+	plaque.anchor_top = 0.08
+	plaque.anchor_bottom = 0.08
+	plaque.offset_left = -245
+	plaque.offset_right = 245
+	plaque.offset_top = 0
+	plaque.offset_bottom = 138
+	plaque.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_layer.add_child(plaque)
+
+	var title := _make_label("五子棋", 42, GameConfig.C_TEXT_INV)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	title.anchor_left = 0.5
+	title.anchor_right = 0.5
+	title.anchor_top = 0.08
+	title.anchor_bottom = 0.08
+	title.offset_left = -190
+	title.offset_right = 190
+	title.offset_top = 28
+	title.offset_bottom = 108
+	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_layer.add_child(title)
+
+	var card := PanelContainer.new()
+	card.anchor_left = 0.5
+	card.anchor_right = 0.5
+	card.anchor_top = 0.49
+	card.anchor_bottom = 0.49
+	card.offset_left = -190
+	card.offset_right = 190
+	card.offset_top = -4
+	card.offset_bottom = 292
+	var card_style := _round_box(Color(GameConfig.C_P1_CREAM, 0.88), 26)
+	card_style.border_color = Color(GameConfig.C_BOARD_FRAME, 0.34)
+	card_style.set_border_width_all(2)
+	card_style.content_margin_left = 26
+	card_style.content_margin_right = 26
+	card_style.content_margin_top = 20
+	card_style.content_margin_bottom = 20
+	card.add_theme_stylebox_override("panel", card_style)
+	_layer.add_child(card)
+
 	var col := VBoxContainer.new()
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
-	col.add_theme_constant_override("separation", 14)
-	_layer.add_child(col)
+	col.add_theme_constant_override("separation", 12)
+	card.add_child(col)
 
-	col.add_child(_plaque("五子棋", 34))
-	var sub := _make_label("· 以棋会友 · 快乐常在 ·", 15, Color(GameConfig.C_TEXT, 0.78))
+	var sub := _make_label("· 以棋会友 · 快乐常在 ·", 16, Color(GameConfig.C_TEXT, 0.78))
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(sub)
-	col.add_child(_spacer(16))
+	col.add_child(_spacer(4))
 
-	var b1 := _make_button("双人对战", GameConfig.C_P1, 260)
+	var b1 := _make_button("双人对战  ·  一起落子", GameConfig.C_P1, 300)
+	b1.custom_minimum_size.y = 56
+	b1.icon = load("res://assets/home/paw_icon.png")
+	b1.add_theme_constant_override("icon_max_width", 28)
 	b1.pressed.connect(_on_pvp_pressed)
 	col.add_child(b1)
 
-	var b2 := _make_button("人机对战", GameConfig.C_P2, 260)
+	var b2 := _make_button("人机对战  ·  挑战 Fivey", GameConfig.C_P2, 300)
+	b2.custom_minimum_size.y = 56
+	b2.icon = load("res://assets/home/paw_icon.png")
+	b2.add_theme_constant_override("icon_max_width", 28)
 	b2.pressed.connect(_show_difficulty)
 	col.add_child(b2)
 
-	col.add_child(_spacer(20))
-	var q := _make_label(_random_quote(), 15, Color(GameConfig.C_TEXT, 0.72))
+	col.add_child(_spacer(2))
+	var q := _make_label(_random_quote(), 14, Color(GameConfig.C_TEXT, 0.72))
 	q.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(q)
 
@@ -222,36 +334,142 @@ func _show_difficulty() -> void:
 	_screen = Screen.DIFFICULTY
 	_clear_layer()
 
-	_layer = CenterContainer.new()
+	# 难度页沿用首页的窗边场景，并以独立的毛毡木框面板承载选项。
+	# 旧版仅显示程序化渐变，页面与首页、对局页的暖木质感脱节。
+	_layer = Control.new()
 	_layer.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_layer)
 
-	var col := VBoxContainer.new()
-	col.alignment = BoxContainer.ALIGNMENT_CENTER
-	col.add_theme_constant_override("separation", 14)
-	_layer.add_child(col)
+	var bg := TextureRect.new()
+	bg.texture = load("res://assets/home/home_background.png")
+	bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_layer.add_child(bg)
 
-	col.add_child(_plaque("选择对手", 26))
-	col.add_child(_spacer(10))
+	var shade := ColorRect.new()
+	shade.color = Color(0.25, 0.15, 0.08, 0.18)
+	shade.set_anchors_preset(Control.PRESET_FULL_RECT)
+	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_layer.add_child(shade)
+
+	var dog := TextureRect.new()
+	dog.texture = load("res://assets/home/dog_home.png")
+	dog.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	dog.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	dog.anchor_left = 0.02
+	dog.anchor_right = 0.30
+	dog.anchor_top = 0.48
+	dog.anchor_bottom = 0.99
+	dog.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_layer.add_child(dog)
+
+	var cat := TextureRect.new()
+	cat.texture = load("res://assets/home/cat_home.png")
+	cat.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	cat.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	cat.anchor_left = 0.70
+	cat.anchor_right = 0.98
+	cat.anchor_top = 0.48
+	cat.anchor_bottom = 0.99
+	cat.flip_h = true
+	cat.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_layer.add_child(cat)
+
+	var panel := TextureRect.new()
+	panel.texture = load("res://assets/ui/difficulty_panel.png")
+	panel.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	panel.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	panel.anchor_left = 0.5
+	panel.anchor_right = 0.5
+	panel.anchor_top = 0.5
+	panel.anchor_bottom = 0.5
+	panel.offset_left = -210
+	panel.offset_right = 210
+	panel.offset_top = -263
+	panel.offset_bottom = 263
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_layer.add_child(panel)
+
+	var title := _make_label("选择对手", 36, GameConfig.C_TEXT)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	title.position = Vector2(470, 105)
+	title.size = Vector2(340, 54)
+	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_layer.add_child(title)
 
 	for i in GameConfig.DIFFICULTY_NAMES.size():
 		var idx := i
-		var box := VBoxContainer.new()
-		box.add_theme_constant_override("separation", 2)
+		var option := _make_difficulty_option(
+			GameConfig.DIFFICULTY_NAMES[idx],
+			GameConfig.DIFFICULTY_TAGLINE[idx],
+			Vector2(475, 183 + 110 * i)
+		)
+		option.pressed.connect(func(): _begin(GameConfig.Mode.PVE, idx))
+		_layer.add_child(option)
 
-		var b := _make_button(GameConfig.DIFFICULTY_NAMES[idx], GameConfig.C_P2, 260)
-		b.pressed.connect(func(): _begin(GameConfig.Mode.PVE, idx))
-		box.add_child(b)
-
-		var t := _make_label(GameConfig.DIFFICULTY_TAGLINE[idx], 14, Color(GameConfig.C_TEXT, 0.72))
-		t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		box.add_child(t)
-		col.add_child(box)
-
-	col.add_child(_spacer(16))
-	var back := _make_button("返回", GameConfig.C_BOARD_FRAME, 140)
+	var back := _make_difficulty_back(Vector2(535, 534))
 	back.pressed.connect(_show_home)
-	col.add_child(back)
+	_layer.add_child(back)
+
+
+func _make_difficulty_option(name: String, tagline: String, pos: Vector2) -> Button:
+	var button := Button.new()
+	button.flat = true
+	button.position = pos
+	button.size = Vector2(330, 78)
+	button.tooltip_text = "%s：%s" % [name, tagline]
+	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+
+	var hover := _round_box(Color(1.0, 1.0, 1.0, 0.14), 28)
+	var pressed := _round_box(Color("#5b94c8", 0.26), 28)
+	var focus := _round_box(Color.TRANSPARENT, 28)
+	focus.border_color = GameConfig.C_ACCENT
+	focus.set_border_width_all(3)
+	button.add_theme_stylebox_override("hover", hover)
+	button.add_theme_stylebox_override("pressed", pressed)
+	button.add_theme_stylebox_override("focus", focus)
+
+	var col := VBoxContainer.new()
+	col.set_anchors_preset(Control.PRESET_FULL_RECT)
+	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	col.alignment = BoxContainer.ALIGNMENT_CENTER
+	col.add_theme_constant_override("separation", 0)
+	button.add_child(col)
+
+	var name_label := _make_label(name, 24, GameConfig.C_TEXT_INV)
+	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	col.add_child(name_label)
+
+	var tagline_label := _make_label(tagline, 14, Color("#eef8ff"))
+	tagline_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tagline_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	col.add_child(tagline_label)
+	return button
+
+
+func _make_difficulty_back(pos: Vector2) -> Button:
+	var button := Button.new()
+	button.flat = true
+	button.position = pos
+	button.size = Vector2(210, 58)
+	button.text = "返回"
+	button.tooltip_text = "返回主页"
+	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	button.add_theme_font_size_override("font_size", 21)
+	button.add_theme_color_override("font_color", GameConfig.C_TEXT_INV)
+	button.add_theme_color_override("font_hover_color", Color("#fff8e8"))
+	button.add_theme_color_override("font_pressed_color", Color("#ffe0ad"))
+	var hover := _round_box(Color(1.0, 1.0, 1.0, 0.12), 25)
+	var focus := _round_box(Color.TRANSPARENT, 25)
+	focus.border_color = GameConfig.C_ACCENT
+	focus.set_border_width_all(3)
+	button.add_theme_stylebox_override("hover", hover)
+	button.add_theme_stylebox_override("focus", focus)
+	return button
 
 
 # ========== 对局 ==========
@@ -281,7 +499,6 @@ func _build_game_ui() -> void:
 	root.add_theme_constant_override("separation", 10)
 	_layer.add_child(root)
 
-	# --- 顶部：标题牌 + 场景短句 ---
 	var top := HBoxContainer.new()
 	top.add_theme_constant_override("separation", 12)
 	root.add_child(top)
@@ -292,17 +509,16 @@ func _build_game_ui() -> void:
 	_quote = _make_label(_random_quote(), 15, Color(GameConfig.C_TEXT, 0.72))
 	top.add_child(_quote)
 
-	# --- 中部：左栏 / 棋盘 / 右栏 ---
 	var mid := HBoxContainer.new()
 	mid.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	mid.add_theme_constant_override("separation", 14)
 	root.add_child(mid)
-
 	mid.add_child(_player_column(true, "玩家一", GameConfig.C_P1, GameConfig.C_P1_CREAM))
 
 	_board_view = BoardView.new()
 	_board_view.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_board_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_board_view.interactive = true
 	_board_view.set_board(board)
 	_board_view.point_pressed.connect(_on_point_pressed)
 	mid.add_child(_board_view)
@@ -310,30 +526,160 @@ func _build_game_ui() -> void:
 	mid.add_child(_player_column(false, "玩家二" if mode == GameConfig.Mode.PVP else "电脑",
 		GameConfig.C_P2, GameConfig.C_P2_CREAM))
 
-	# --- 底部：状态 + 操作 ---
-	var bottom := HBoxContainer.new()
-	bottom.add_theme_constant_override("separation", 12)
-	root.add_child(bottom)
+	# 操作盘仍使用此前校准过的独立点击区域。
+	_hud = CanvasLayer.new()
+	_hud.layer = 2
+	add_child(_hud)
+	_build_action_controls()
 
-	var back := _make_button("返回", GameConfig.C_BOARD_FRAME, 96)
-	back.custom_minimum_size.y = 44
+
+func _make_art_texture(parent: Node, asset_path: String, pos: Vector2,
+		control_size: Vector2, stretch_mode := TextureRect.STRETCH_KEEP_ASPECT_CENTERED) -> TextureRect:
+	var art := TextureRect.new()
+	art.texture = load(asset_path)
+	art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	art.stretch_mode = stretch_mode
+	art.position = pos
+	art.size = control_size
+	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(art)
+	return art
+
+
+func _make_turn_highlight(pos: Vector2, control_size: Vector2) -> PanelContainer:
+	var panel := PanelContainer.new()
+	panel.position = pos
+	panel.size = control_size
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_hud.add_child(panel)
+	return panel
+
+
+func _make_piece_count(pos: Vector2, control_size: Vector2,
+		bg: Color, text_color: Color) -> Label:
+	var cover := PanelContainer.new()
+	cover.position = pos
+	cover.size = control_size
+	cover.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = bg
+	sb.set_corner_radius_all(14)
+	cover.add_theme_stylebox_override("panel", sb)
+	_hud.add_child(cover)
+
+	var label := _make_label("× 0", 28, text_color)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cover.add_child(label)
+	return label
+
+
+func _build_action_controls() -> void:
+	if _actions != null and is_instance_valid(_actions):
+		_actions.queue_free()
+
+	_actions = Control.new()
+	# 仅覆盖右上角工具岛所在区域，绝不遮挡棋盘输入。
+	_actions.position = Vector2(1038, 6)
+	_actions.size = Vector2(220, 220)
+	_actions.mouse_filter = Control.MOUSE_FILTER_PASS
+	_hud.add_child(_actions)
+
+	# 已选定 C 方案：三瓣棋子岛。
+	_build_action_tokens()
+
+
+func _action_button(text: String, icon: String, bg: Color, min_w := 112.0) -> Button:
+	var b := _make_button(icon + "  " + text, bg, min_w)
+	b.custom_minimum_size.y = 46
+	b.add_theme_font_size_override("font_size", 17)
+	return b
+
+
+func _build_action_plaques() -> void:
+	# A · 木牌胶囊：最贴合原型图，三键横向收在棋盘下沿。
+	var rail := HBoxContainer.new()
+	rail.position = Vector2(315, 650)
+	rail.size = Vector2(650, 54)
+	rail.alignment = BoxContainer.ALIGNMENT_CENTER
+	rail.add_theme_constant_override("separation", 10)
+	_actions.add_child(rail)
+
+	var back := _action_button("返回", "↩", GameConfig.C_BOARD_FRAME, 128)
 	back.pressed.connect(_on_back_pressed)
-	bottom.add_child(back)
-
-	_status = _make_label("", 17, Color(GameConfig.C_TEXT, 0.9))
-	_status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_status.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	bottom.add_child(_status)
-
-	_btn_undo = _make_button(GameConfig.BTN_UNDO, GameConfig.C_ACCENT, 120)
-	_btn_undo.custom_minimum_size.y = 44
+	rail.add_child(back)
+	_btn_undo = _action_button(GameConfig.BTN_UNDO, "⟲", GameConfig.C_ACCENT, 140)
 	_btn_undo.pressed.connect(_do_undo)
-	bottom.add_child(_btn_undo)
-
-	var sur := _make_button(GameConfig.BTN_SURRENDER, GameConfig.C_P1, 120)
-	sur.custom_minimum_size.y = 44
+	rail.add_child(_btn_undo)
+	var sur := _action_button(GameConfig.BTN_SURRENDER, "⚑", GameConfig.C_P1, 128)
 	sur.pressed.connect(_on_surrender_pressed)
-	bottom.add_child(sur)
+	rail.add_child(sur)
+
+	_status = _make_label("", 16, Color(GameConfig.C_TEXT, 0.9))
+	_status.position = Vector2(525, 610)
+	_status.size = Vector2(230, 32)
+	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_actions.add_child(_status)
+
+
+func _build_action_island() -> void:
+	# B · 悬浮图标岛：减少文字重量，像棋盘边缘的小工具栏。
+	var rail := HBoxContainer.new()
+	rail.position = Vector2(1035, 335)
+	rail.size = Vector2(150, 178)
+	rail.alignment = BoxContainer.ALIGNMENT_CENTER
+	rail.vertical = true
+	rail.add_theme_constant_override("separation", 9)
+	_actions.add_child(rail)
+
+	var back := _action_button("返回", "↩", Color("#8b6248"), 132)
+	back.pressed.connect(_on_back_pressed)
+	rail.add_child(back)
+	_btn_undo = _action_button(GameConfig.BTN_UNDO, "⟲", GameConfig.C_ACCENT, 132)
+	_btn_undo.pressed.connect(_do_undo)
+	rail.add_child(_btn_undo)
+	var sur := _action_button(GameConfig.BTN_SURRENDER, "⚑", Color("#a95f55"), 132)
+	sur.pressed.connect(_on_surrender_pressed)
+	rail.add_child(sur)
+
+	_status = _make_label("", 15, Color(GameConfig.C_TEXT_INV, 0.92))
+	_status.position = Vector2(1015, 525)
+	_status.size = Vector2(190, 30)
+	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_actions.add_child(_status)
+
+
+func _build_action_tokens() -> void:
+	# 木质操作岛是底图，按钮坐标按底板凹槽校准。
+	_make_art_texture(_actions, "res://assets/ui/action_island_base.png",
+		Vector2.ZERO, Vector2(220, 210), TextureRect.STRETCH_KEEP_ASPECT_CENTERED)
+
+	_make_icon_action("res://assets/ui/action_undo_round.png", "悔棋",
+		Vector2(74, 28), _do_undo)
+	_make_icon_action("res://assets/ui/action_return_round.png", "返回",
+		Vector2(33, 88), _on_back_pressed)
+	_make_icon_action("res://assets/ui/action_surrender_round.png", "认输",
+		Vector2(110, 83), _on_surrender_pressed, Vector2(83, 83))
+
+
+func _make_icon_action(asset_path: String, caption: String, pos: Vector2,
+		on_pressed: Callable, button_size := Vector2(72, 72)) -> TextureButton:
+	var b := TextureButton.new()
+	b.texture_normal = load(asset_path)
+	b.ignore_texture_size = true
+	b.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
+	b.custom_minimum_size = button_size
+	b.size = button_size
+	b.position = pos
+	b.z_index = 1
+	b.tooltip_text = caption
+	b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	b.pressed.connect(on_pressed)
+	_actions.add_child(b)
+	if caption == GameConfig.BTN_UNDO:
+		_btn_undo = b
+	return b
 
 
 func _player_column(is_p1: bool, name: String, accent: Color, cream: Color) -> VBoxContainer:
@@ -483,19 +829,17 @@ func _do_surrender() -> void:
 
 
 func _on_back_pressed() -> void:
-	if board.is_over() or board.move_count() == 0:
-		_show_home()
-		return
-	_show_confirm("要离开这局棋吗？", "当前进度不会保存哦。", "离开", "再下一会儿", _show_home)
+	var body := "当前进度不会保存哦。" if board.move_count() > 0 else "这局还没开始，要回到主页吗？"
+	_show_confirm("要返回主页吗？", body, "返回主页", "继续下棋", _show_home)
 
 
 func _refresh() -> void:
 	if _board_view != null:
 		_board_view.queue_redraw()
 	if _count_p1 != null:
-		_count_p1.text = "手数 %d" % _count_of(GameConfig.BLACK)
+		_count_p1.text = "× %d" % _count_of(GameConfig.BLACK)
 	if _count_p2 != null:
-		_count_p2.text = "手数 %d" % _count_of(GameConfig.WHITE)
+		_count_p2.text = "× %d" % _count_of(GameConfig.WHITE)
 	if _btn_undo != null:
 		_btn_undo.disabled = _ai_busy or board.is_over() or not board.can_undo()
 	if _status != null and not board.is_over():
@@ -537,7 +881,17 @@ func _flash_status(text: String) -> void:
 func _show_confirm(title: String, body: String, ok_text: String,
 		cancel_text: String, on_ok: Callable) -> void:
 	var modal := _make_modal_base()
-	var box := modal.get_node("Box") as VBoxContainer
+	var box := modal.get_node("Center/Card/Box") as VBoxContainer
+	# 使用与对局工具岛相同的图标资源，避免系统 Emoji 在各平台字体中变形或缺字。
+	var badge := TextureRect.new()
+	badge.texture = load("res://assets/ui/action_surrender_round.png") if title.contains("认输") \
+		else load("res://assets/ui/action_return_round.png")
+	badge.custom_minimum_size = Vector2(54, 54)
+	badge.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	badge.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	badge.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(badge)
 	box.add_child(_modal_title(title))
 	box.add_child(_make_label(body, 15, Color(GameConfig.C_TEXT, 0.82)))
 
@@ -551,7 +905,8 @@ func _show_confirm(title: String, body: String, ok_text: String,
 	cancel.pressed.connect(_close_modal)
 	row.add_child(cancel)
 
-	var ok := _make_button(ok_text, GameConfig.C_ACCENT, 130)
+	var ok_color := Color("#a95f55") if title.contains("认输") else GameConfig.C_ACCENT
+	var ok := _make_button(ok_text, ok_color, 130)
 	ok.custom_minimum_size.y = 46
 	ok.pressed.connect(func():
 		_close_modal()
@@ -574,7 +929,7 @@ func _show_result() -> void:
 		title = "「%s」赢了！" % ("玩家一" if won else "玩家二")
 
 	var modal := _make_modal_base()
-	var box := modal.get_node("Box") as VBoxContainer
+	var box := modal.get_node("Center/Card/Box") as VBoxContainer
 	box.add_child(_modal_title(title))
 
 	var lines := "本局共 %d 手" % board.move_count()
@@ -613,7 +968,14 @@ func _make_modal_base() -> Control:
 	modal.name = "Modal"
 	modal.set_anchors_preset(Control.PRESET_FULL_RECT)
 	modal.mouse_filter = Control.MOUSE_FILTER_STOP
-	add_child(modal)
+	# Keep the full-screen dimmer above action controls with their own z_index.
+	modal.z_index = 2
+	# The gameplay HUD lives on a higher CanvasLayer than the scene root. Put the
+	# modal there too so its dimmer covers the action island and player overlays.
+	if _hud != null and is_instance_valid(_hud):
+		_hud.add_child(modal)
+	else:
+		add_child(modal)
 
 	var dim := ColorRect.new()
 	dim.color = GameConfig.C_OVERLAY
@@ -621,11 +983,18 @@ func _make_modal_base() -> Control:
 	modal.add_child(dim)
 
 	var center := CenterContainer.new()
+	center.name = "Center"
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	modal.add_child(center)
 
 	var card := PanelContainer.new()
+	card.name = "Card"
+	card.custom_minimum_size = Vector2(420, 250)
 	var sb := _round_box(GameConfig.C_P1_CREAM, 18)
+	sb.border_color = GameConfig.C_BOARD_FRAME
+	sb.set_border_width_all(3)
+	sb.shadow_size = 10
+	sb.shadow_offset = Vector2(0, 6)
 	sb.content_margin_left = 32
 	sb.content_margin_right = 32
 	sb.content_margin_top = 26

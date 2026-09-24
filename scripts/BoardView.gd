@@ -1,6 +1,6 @@
 extends Control
 class_name BoardView
-## 棋盘视图 —— M1 占位美术（程序化绘制，不依赖任何美术资源）。
+## 棋盘视图 —— 绘制棋盘网格与爪印棋子资源。
 ##
 ## 布局遵循需求 §4.4（正方形木框棋盘居中）与 §4.5（组件规格）；
 ## 配色取自 GameConfig（= 需求 §4.2 取样值）。
@@ -12,6 +12,11 @@ signal point_pressed(cell: Vector2i)
 
 const PAD_RATIO := 0.05      ## 棋盘四周留白（相对自身边长）
 const STONE_RATIO := 0.40    ## 棋子半径 / 格距
+const PIECE_TEXTURE := preload("res://assets/pieces/schemes/pieces_scheme_01_paws.png")
+const PIECE_TILE_SIZE := 887.0
+const PIECE_BODY_RATIO := 0.755  ## 棋子实心主体直径 / 单格纹理尺寸
+const PIECE_BLACK_BODY_CENTER := Vector2(497.0, 438.0)
+const PIECE_WHITE_BODY_CENTER := Vector2(384.0, 438.5)
 
 var board: Board
 var interactive: bool = false
@@ -162,17 +167,23 @@ func _draw_winning_beam() -> void:
 
 
 func _draw_stones() -> void:
+	var sprite_size := _stone_r * 2.0 / PIECE_BODY_RATIO
 	for y in board.size:
 		for x in board.size:
 			var c := board.get_cell(x, y)
 			if c == GameConfig.EMPTY:
 				continue
 			var p := _point_pos(x, y)
-			var body := GameConfig.C_STONE_BLACK if c == GameConfig.BLACK else GameConfig.C_STONE_WHITE
-			draw_circle(p + Vector2(0, _stone_r * 0.14), _stone_r, Color(0.22, 0.14, 0.08, 0.22))
-			draw_circle(p, _stone_r, body)
-			draw_circle(p - Vector2(_stone_r * 0.30, _stone_r * 0.32),
-				_stone_r * 0.24, Color(1, 1, 1, 0.30))
+			var source_rect := Rect2(Vector2.ZERO, Vector2.ONE * PIECE_TILE_SIZE)
+			var body_center := PIECE_BLACK_BODY_CENTER
+			if c == GameConfig.WHITE:
+				source_rect.position.x = PIECE_TILE_SIZE
+				body_center = PIECE_WHITE_BODY_CENTER
+			var draw_rect := Rect2(
+				p - body_center / PIECE_TILE_SIZE * sprite_size,
+				Vector2.ONE * sprite_size
+			)
+			draw_texture_rect_region(PIECE_TEXTURE, draw_rect, source_rect)
 
 
 func _draw_last_marker() -> void:

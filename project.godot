@@ -1,6 +1,10 @@
-; MoeFive · 萌宠五子棋 —— Godot 4.7.2 项目配置
-; 技术栈已定稿：Godot 4.7.2 stable + GDScript + Compatibility 渲染器
-; 依据：docs/技术选型评估.md
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
 
 config_version=5
 
@@ -11,12 +15,22 @@ config/description="萌宠五子棋 · Moe 系列棋类第二作"
 run/main_scene="res://main.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 
+[autoload]
+
+MCPRuntimeProbe="*uid://bsg12huaf1u5i"
+
 [display]
 
 window/size/viewport_width=1280
 window/size/viewport_height=720
+window/size/window_width_override=1920
+window/size/window_height_override=1080
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/godot_mcp/plugin.cfg")
 
 [rendering]
 
