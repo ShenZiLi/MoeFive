@@ -167,11 +167,15 @@ jobs:
           set -euo pipefail
           mkdir -p build/macos build/ios
           "$GODOT_BIN" --headless --path . --export-release 'macOS' build/macos/MoeFive-macOS.zip
-          "$GODOT_BIN" --headless --path . --export-release 'iOS Xcode' build/ios
+          "$GODOT_BIN" --headless --path . --export-release 'iOS Xcode' build/MoeFive-iOS-Xcode-export.zip
+          test -s build/MoeFive-iOS-Xcode-export.zip
+          unzip -q build/MoeFive-iOS-Xcode-export.zip -d build/ios
           # The exporter requires a syntactically valid Team ID to generate the Xcode
           # project. Remove the placeholder so Xcode prompts the user to choose their
           # own development team before signing or installing the app.
-          find build/ios -name project.pbxproj -type f -exec sed -i '' 's/DEVELOPMENT_TEAM = MOEFIVE001;/DEVELOPMENT_TEAM = "";/g' {} \;
+          project_file="$(find build/ios -name project.pbxproj -type f -print -quit)"
+          test -n "$project_file"
+          sed -i '' 's/DEVELOPMENT_TEAM = MOEFIVE001;/DEVELOPMENT_TEAM = "";/g' "$project_file"
           cat > build/ios/README-iOS.txt <<'EOF'
           MoeFive iOS Xcode project
 
@@ -181,6 +185,7 @@ jobs:
           signing setup are required for App Store distribution.
           EOF
           ditto -c -k --sequesterRsrc --keepParent build/ios build/MoeFive-iOS-Xcode.zip
+          unzip -Z1 build/MoeFive-iOS-Xcode.zip | grep -E '\.xcodeproj/project\.pbxproj$'
           shasum -a 256 build/macos/MoeFive-macOS.zip build/MoeFive-iOS-Xcode.zip
 
       - uses: actions/upload-artifact@v4
