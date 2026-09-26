@@ -42,7 +42,9 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools
 
       - name: Install Android SDK packages and debug signing key
         shell: pwsh
@@ -117,7 +119,7 @@ jobs:
           version='4.7.2-stable'
           mkdir -p "$RUNNER_TEMP/godot" "$HOME/Library/Application Support/Godot/export_templates/4.7.2.stable"
           curl -fL "https://github.com/godotengine/godot-builds/releases/download/$version/Godot_v${version}_macos.universal.zip" -o "$RUNNER_TEMP/godot/engine.zip"
-          curl -fL "https://github.com/godotengine/godot-builds/releases/download/$version/Godot_v${version}-stable_export_templates.tpz" -o "$RUNNER_TEMP/godot/templates.zip"
+          curl -fL "https://github.com/godotengine/godot-builds/releases/download/$version/Godot_v${version}_export_templates.tpz" -o "$RUNNER_TEMP/godot/templates.zip"
           unzip -q "$RUNNER_TEMP/godot/engine.zip" -d "$RUNNER_TEMP/godot/engine"
           unzip -q "$RUNNER_TEMP/godot/templates.zip" -d "$RUNNER_TEMP/godot/templates"
           template_source="$RUNNER_TEMP/godot/templates/templates"
