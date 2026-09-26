@@ -225,6 +225,7 @@ jobs:
         with:
           name: MoeFive ${{ github.ref_name }}
           prerelease: true
+          overwrite_files: true
           generate_release_notes: true
           body: |
             ## Platform builds
