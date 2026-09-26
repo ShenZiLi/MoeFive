@@ -91,19 +91,28 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Force -Path build/windows, build/android | Out-Null
-          & $env:GODOT_EXE --headless --path . --export-release 'Windows Desktop' build/windows/MoeFive-Windows.exe
+          # Use the output paths declared by export_presets.cfg. Passing an alternate
+          # path here can diverge from what Godot exports on Windows runners.
+          & $env:GODOT_EXE --headless --path . --export-release 'Windows Desktop'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          & $env:GODOT_EXE --headless --path . --export-debug 'Android APK' build/android/MoeFive-Android-debug.apk
+          & $env:GODOT_EXE --headless --path . --export-debug 'Android APK'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Get-FileHash build/windows/MoeFive-Windows.exe -Algorithm SHA256 | Format-List
-          Get-FileHash build/android/MoeFive-Android-debug.apk -Algorithm SHA256 | Format-List
+          $windowsBuild = 'build/windows/MoeFive.exe'
+          $androidBuild = 'build/android/MoeFive-Android.apk'
+          foreach ($build in @($windowsBuild, $androidBuild)) {
+            if (-not (Test-Path -LiteralPath $build -PathType Leaf)) {
+              Get-ChildItem build -Recurse | Select-Object FullName, Length | Format-Table -AutoSize
+              throw "Godot reported a successful export but did not create $build."
+            }
+          }
+          Get-FileHash $windowsBuild, $androidBuild -Algorithm SHA256 | Format-List
 
       - uses: actions/upload-artifact@v4
         with:
           name: windows-android
           path: |
-            build/windows/MoeFive-Windows.exe
-            build/android/MoeFive-Android-debug.apk
+            build/windows/MoeFive.exe
+            build/android/MoeFive-Android.apk
           if-no-files-found: error
 
   macos-ios:
