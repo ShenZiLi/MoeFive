@@ -167,8 +167,22 @@ jobs:
           set -euo pipefail
           mkdir -p build/macos build/ios
           "$GODOT_BIN" --headless --path . --export-release 'macOS' build/macos/MoeFive-macOS.zip
+          set +e
           "$GODOT_BIN" --headless --path . --export-release 'iOS Xcode' build/MoeFive-iOS-Xcode-export.zip
-          test -s build/MoeFive-iOS-Xcode-export.zip
+          ios_export_status=$?
+          set -e
+          if [[ ! -s build/MoeFive-iOS-Xcode-export.zip ]]; then
+            find build -maxdepth 3 -print
+            exit "$ios_export_status"
+          fi
+          # Godot 4.7.2 can return 1 during shutdown after completing the iOS export
+          # because of a resource cleanup diagnostic. Accept that case only when the
+          # generated ZIP is valid and contains the Xcode project file.
+          unzip -Z1 build/MoeFive-iOS-Xcode-export.zip > build/ios-export-contents.txt
+          if ! grep -qE '\.xcodeproj/project\.pbxproj$' build/ios-export-contents.txt; then
+            head -80 build/ios-export-contents.txt
+            exit 1
+          fi
           unzip -q build/MoeFive-iOS-Xcode-export.zip -d build/ios
           # The exporter requires a syntactically valid Team ID to generate the Xcode
           # project. Remove the placeholder so Xcode prompts the user to choose their
