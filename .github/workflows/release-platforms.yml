@@ -91,19 +91,25 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Force -Path build/windows, build/android | Out-Null
-          # Use the output paths declared by export_presets.cfg. Passing an alternate
-          # path here can diverge from what Godot exports on Windows runners.
-          & $env:GODOT_EXE --headless --path . --export-release 'Windows Desktop'
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          & $env:GODOT_EXE --headless --path . --export-debug 'Android APK'
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $windowsBuild = 'build/windows/MoeFive.exe'
-          $androidBuild = 'build/android/MoeFive-Android.apk'
-          foreach ($build in @($windowsBuild, $androidBuild)) {
-            if (-not (Test-Path -LiteralPath $build -PathType Leaf)) {
-              Get-ChildItem build -Recurse | Select-Object FullName, Length | Format-Table -AutoSize
-              throw "Godot reported a successful export but did not create $build."
-            }
+          $windowsBuild = Join-Path $PWD 'build/windows/MoeFive-Windows.exe'
+          $androidBuild = Join-Path $PWD 'build/android/MoeFive-Android-debug.apk'
+          Write-Output "Exporting Windows build to $windowsBuild"
+          & $env:GODOT_EXE --headless --path . --export-release 'Windows Desktop' $windowsBuild
+          $windowsExitCode = $LASTEXITCODE
+          Write-Output "Windows export exit code: $windowsExitCode"
+          if ($windowsExitCode -ne 0) { exit $windowsExitCode }
+          if (-not (Test-Path -LiteralPath $windowsBuild -PathType Leaf)) {
+            Get-ChildItem -Force -Recurse build | Select-Object FullName, Length | Format-Table -AutoSize
+            throw "Godot reported a successful Windows export but did not create $windowsBuild."
+          }
+          Write-Output "Exporting Android build to $androidBuild"
+          & $env:GODOT_EXE --headless --path . --export-debug 'Android APK' $androidBuild
+          $androidExitCode = $LASTEXITCODE
+          Write-Output "Android export exit code: $androidExitCode"
+          if ($androidExitCode -ne 0) { exit $androidExitCode }
+          if (-not (Test-Path -LiteralPath $androidBuild -PathType Leaf)) {
+            Get-ChildItem -Force -Recurse build | Select-Object FullName, Length | Format-Table -AutoSize
+            throw "Godot reported a successful Android export but did not create $androidBuild."
           }
           Get-FileHash $windowsBuild, $androidBuild -Algorithm SHA256 | Format-List
 
@@ -111,8 +117,8 @@ jobs:
         with:
           name: windows-android
           path: |
-            build/windows/MoeFive.exe
-            build/android/MoeFive-Android.apk
+            build/windows/MoeFive-Windows.exe
+            build/android/MoeFive-Android-debug.apk
           if-no-files-found: error
 
   macos-ios:
