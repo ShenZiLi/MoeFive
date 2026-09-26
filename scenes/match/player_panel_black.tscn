@@ -1,0 +1,47 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scenes/match/player_panel.gd" id="1_script"]
+[ext_resource type="Texture2D" path="res://assets/match/v2/ui/player_card_brown.png" id="2_card"]
+[ext_resource type="Texture2D" path="res://assets/match/v2/characters/dog_half.png" id="3_pet"]
+[ext_resource type="Texture2D" path="res://assets/pieces/black_piece.png" id="4_stone"]
+[ext_resource type="PackedScene" path="res://scenes/match/speech_bubble.tscn" id="5_bubble"]
+
+[node name="PlayerPanelBlack" type="Control"]
+mouse_filter = 2
+script = ExtResource("1_script")
+
+[node name="Card" type="TextureRect" parent="."]
+mouse_filter = 2
+texture = ExtResource("2_card")
+expand_mode = 1
+stretch_mode = 0
+
+[node name="Pet" type="TextureRect" parent="."]
+mouse_filter = 2
+texture = ExtResource("3_pet")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Name" type="Label" parent="."]
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.352941, 0.227451, 0.133333, 1)
+theme_override_font_sizes/font_size = 30
+text = "玩家一"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Stone" type="TextureRect" parent="."]
+mouse_filter = 2
+texture = ExtResource("4_stone")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Count" type="Label" parent="."]
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.352941, 0.227451, 0.133333, 1)
+theme_override_font_sizes/font_size = 30
+text = "× 0"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="SpeechBubble" parent="." instance=ExtResource("5_bubble")]

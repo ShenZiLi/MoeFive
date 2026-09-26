@@ -1,0 +1,103 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Texture2D" path="res://assets/match/board/wood_surface.png" id="1_surface"]
+[ext_resource type="Texture2D" path="res://assets/match/board/wood_frame.png" id="2_frame"]
+[ext_resource type="Texture2D" path="res://assets/match/board/corner_paw.png" id="3_paw"]
+[ext_resource type="Script" path="res://scripts/BoardView.gd" id="4_board"]
+[ext_resource type="Script" path="res://scenes/match/board_panel.gd" id="5_panel"]
+[ext_resource type="Texture2D" path="res://assets/match/v2/board/reference_source.png" id="6_reference"]
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_reference_board"]
+atlas = ExtResource("6_reference")
+region = Rect2(389, 3, 896, 936)
+
+[node name="BoardPanel" type="Control"]
+offset_right = 680.0
+offset_bottom = 680.0
+mouse_filter = 1
+script = ExtResource("5_panel")
+
+[node name="WoodSurface" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+texture = ExtResource("1_surface")
+expand_mode = 1
+
+[node name="WoodFrame" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+texture = ExtResource("2_frame")
+expand_mode = 1
+
+[node name="ReferenceBoard" type="TextureRect" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+texture = SubResource("AtlasTexture_reference_board")
+expand_mode = 1
+
+[node name="BoardView" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("4_board")
+
+[node name="CornerPaws" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="TopLeft" type="TextureRect" parent="CornerPaws"]
+offset_left = 7.0
+offset_top = 7.0
+offset_right = 70.0
+offset_bottom = 70.0
+mouse_filter = 2
+texture = ExtResource("3_paw")
+expand_mode = 1
+
+[node name="TopRight" type="TextureRect" parent="CornerPaws"]
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -70.0
+offset_top = 7.0
+offset_right = -7.0
+offset_bottom = 70.0
+mouse_filter = 2
+texture = ExtResource("3_paw")
+expand_mode = 1
+
+[node name="BottomLeft" type="TextureRect" parent="CornerPaws"]
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 7.0
+offset_top = -70.0
+offset_right = 70.0
+offset_bottom = -7.0
+mouse_filter = 2
+texture = ExtResource("3_paw")
+expand_mode = 1
+
+[node name="BottomRight" type="TextureRect" parent="CornerPaws"]
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -70.0
+offset_top = -70.0
+offset_right = -7.0
+offset_bottom = -7.0
+mouse_filter = 2
+texture = ExtResource("3_paw")

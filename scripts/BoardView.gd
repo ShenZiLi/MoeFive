@@ -1,3 +1,4 @@
+@tool
 extends Control
 class_name BoardView
 ## 棋盘视图 —— 绘制棋盘网格与爪印棋子资源。
@@ -10,7 +11,7 @@ class_name BoardView
 
 signal point_pressed(cell: Vector2i)
 
-const PAD_RATIO := 0.05      ## 棋盘四周留白（相对自身边长）
+const GRID_RATIO := 0.84     ## 紧凑布局格线比例
 const STONE_RATIO := 0.40    ## 棋子半径 / 格距
 const PIECE_TEXTURE := preload("res://assets/pieces/schemes/pieces_scheme_01_paws.png")
 const PIECE_TILE_SIZE := 887.0
@@ -20,16 +21,17 @@ const PIECE_WHITE_BODY_CENTER := Vector2(384.0, 438.5)
 
 var board: Board
 var interactive: bool = false
+var reference_mode: bool = false
+var photo_mode: bool = false
 var hover_cell := Vector2i(-1, -1)
 
 var _frame_rect := Rect2()
 var _board_rect := Rect2()
 var _gap := 0.0
+var _gap_x := 0.0
+var _gap_y := 0.0
 var _origin := Vector2.ZERO
 var _stone_r := 0.0
-
-var _frame_style: StyleBoxFlat
-
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
@@ -43,36 +45,44 @@ func set_board(b: Board) -> void:
 # ========== 几何 ==========
 
 func _recalc() -> void:
-	if board == null:
-		return
-	var n: int = board.size
-	var side: float = minf(size.x, size.y) * (1.0 - PAD_RATIO * 2.0)
-	var pad: float = side * 0.075     # 木框宽度
-	_board_rect = Rect2(
-		(size.x - side) * 0.5,
-		(size.y - side) * 0.5,
-		side,
-		side
-	)
-	_frame_rect = _board_rect.grow(pad)
-	_gap = side / float(n - 1)
+	var n: int = board.size if board != null else GameConfig.BOARD_SIZE
+	if photo_mode:
+		# 图 1 原始像素坐标；BoardPanel 裁切范围与这些数值共用。
+		_board_rect = Rect2(size.x * (256.0 / 3572.0), size.y * (237.0 / 3503.0),
+			size.x * (3097.0 / 3572.0), size.y * (3030.0 / 3503.0))
+	elif reference_mode:
+		# 原型图中棋盘框的裁切范围是 (389, 3, 896, 936)。
+		# x=451 与 y=54 是坐标栏边界，首个可落子交点在 (499, 107)。
+		_board_rect = Rect2(size.x * (110.0 / 896.0), size.y * (104.0 / 936.0),
+			size.x * (736.0 / 896.0), size.y * (755.0 / 936.0))
+	elif size.y > size.x * 1.05:
+		# 桌面原型棋盘：外框与交点区是略微纵向拉长的矩形。
+		_board_rect = Rect2(size.x * 0.092, size.y * 0.120, size.x * 0.834, size.y * 0.781)
+	else:
+		var side: float = minf(size.x, size.y) * GRID_RATIO
+		_board_rect = Rect2((size.x - side) * 0.5, (size.y - side) * 0.5, side, side)
+	_frame_rect = Rect2(Vector2.ZERO, size)
+	_gap_x = _board_rect.size.x / float(n - 1)
+	_gap_y = _board_rect.size.y / float(n - 1)
+	_gap = minf(_gap_x, _gap_y)
 	_origin = _board_rect.position
 	_stone_r = _gap * STONE_RATIO
 
 
 func _point_pos(x: int, y: int) -> Vector2:
-	return _origin + Vector2(float(x) * _gap, float(y) * _gap)
+	return _origin + Vector2(float(x) * _gap_x, float(y) * _gap_y)
 
 
 ## 屏幕坐标 → 交叉点（越界返回 (-1, -1)）
 func cell_at(pos: Vector2) -> Vector2i:
-	if board == null or _gap <= 0.0:
+	if board == null:
 		return Vector2i(-1, -1)
-	if not _frame_rect.grow(_gap * 0.5).has_point(pos):
+	_recalc()
+	if _gap <= 0.0 or not _board_rect.grow(maxf(_gap_x, _gap_y) * 0.5).has_point(pos):
 		return Vector2i(-1, -1)
 	var rel := pos - _origin
-	var cx := int(roundf(rel.x / _gap))
-	var cy := int(roundf(rel.y / _gap))
+	var cx := int(roundf(rel.x / _gap_x))
+	var cy := int(roundf(rel.y / _gap_y))
 	if cx < 0 or cx >= board.size or cy < 0 or cy >= board.size:
 		return Vector2i(-1, -1)
 	return Vector2i(cx, cy)
@@ -81,39 +91,20 @@ func cell_at(pos: Vector2) -> Vector2i:
 # ========== 绘制 ==========
 
 func _draw() -> void:
+	_recalc()
+	if not reference_mode and not photo_mode:
+		_draw_grid()
 	if board == null:
 		return
-	_recalc()
-	_draw_frame()
-	_draw_grid()
 	_draw_winning_beam()
 	_draw_stones()
 	_draw_last_marker()
 	_draw_hover()
 
 
-func _draw_frame() -> void:
-	if _frame_style == null:
-		_frame_style = StyleBoxFlat.new()
-	_frame_style.bg_color = GameConfig.C_BOARD_FRAME
-	_frame_style.set_corner_radius_all(int(maxf(6.0, _gap * 0.38)))
-	_frame_style.shadow_color = Color(0.20, 0.12, 0.06, 0.22)
-	_frame_style.shadow_size = int(maxf(2.0, _gap * 0.20))
-	_frame_style.shadow_offset = Vector2(0, maxf(2.0, _gap * 0.14))
-	draw_style_box(_frame_style, _frame_rect)
-
-	# 木底（上亮下暗，模拟窗光）
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = GameConfig.C_BOARD_LIGHT
-	sb.set_corner_radius_all(int(maxf(4.0, _gap * 0.22)))
-	draw_style_box(sb, _board_rect)
-	draw_rect(Rect2(_board_rect.position, Vector2(_board_rect.size.x, _board_rect.size.y * 0.5)),
-		Color(GameConfig.C_BOARD_DARK, 0.16))
-
-
 func _draw_grid() -> void:
 	var line_w: float = maxf(1.0, _gap * 0.055)
-	var n: int = board.size
+	var n: int = board.size if board != null else GameConfig.BOARD_SIZE
 	var line_col := Color(GameConfig.C_BOARD_LINE, 0.85)
 
 	for i in n:
@@ -126,7 +117,10 @@ func _draw_grid() -> void:
 		draw_line(Vector2(p.x, p.y), Vector2(q.x, q.y), line_col, line_w)
 
 	# 星位
-	for sp in GameConfig.STAR_POINTS:
+	var star_points := GameConfig.STAR_POINTS
+	if size.y > size.x * 1.05:
+		star_points = [Vector2i(2, 3), Vector2i(11, 3), Vector2i(7, 7), Vector2i(2, 10), Vector2i(11, 10)]
+	for sp in star_points:
 		if sp.x < n and sp.y < n:
 			draw_circle(_point_pos(sp.x, sp.y), maxf(1.6, _gap * 0.11), GameConfig.C_BOARD_LINE)
 
@@ -139,20 +133,27 @@ func _draw_labels() -> void:
 		return
 	var fs: int = int(maxf(9.0, _gap * 0.38))
 	var col := Color(GameConfig.C_TEXT, 0.65)
-	var n: int = board.size
+	var n: int = board.size if board != null else GameConfig.BOARD_SIZE
 
-	for i in n:
-		# 列标 A–O（左→右）
+	var desktop_reference := size.y > size.x * 1.05
+	var columns_to_label := n - 1 if desktop_reference else n
+	for i in columns_to_label:
+		# 原型右上角爪印覆盖 O；紧凑布局保留全部列标。
 		var letter := String.chr(65 + i)
 		var lw := font.get_string_size(letter, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 		draw_string(font,
-			Vector2(_origin.x + float(i) * _gap - lw * 0.5, _board_rect.position.y - _gap * 0.30),
+			Vector2(_origin.x + float(i) * _gap_x - lw * 0.5, _board_rect.position.y - _gap_y * 0.30),
 			letter, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, col)
+	for i in n:
 		# 行号 15→1（屏幕自上而下；需求 §3.1.1：1 在底部）
 		var num := str(n - i)
 		var nw := font.get_string_size(num, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+		var label_y := _origin.y + float(i) * _gap_y + fs * 0.36
+		if desktop_reference:
+			# 原型的行号从首行下方开始，到末行上方结束。
+			label_y = _origin.y + _gap_y * (0.9 + float(i) * 0.92) + fs * 0.36
 		draw_string(font,
-			Vector2(_origin.x - _gap * 0.22 - nw, _origin.y + float(i) * _gap + fs * 0.36),
+			Vector2(_origin.x - _gap_x * 0.22 - nw, label_y),
 			num, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, col)
 
 

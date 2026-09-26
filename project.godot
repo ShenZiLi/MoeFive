@@ -21,6 +21,8 @@ MCPRuntimeProbe="*uid://bsg12huaf1u5i"
 
 [display]
 
+; Mobile devices stay in landscape; a portrait-held device rotates the display 90°.
+window/handheld/orientation=4
 window/size/viewport_width=1280
 window/size/viewport_height=720
 window/size/window_width_override=1920
