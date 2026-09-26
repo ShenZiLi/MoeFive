@@ -93,20 +93,26 @@ jobs:
           New-Item -ItemType Directory -Force -Path build/windows, build/android | Out-Null
           $windowsBuild = Join-Path $PWD 'build/windows/MoeFive-Windows.exe'
           $androidBuild = Join-Path $PWD 'build/android/MoeFive-Android-debug.apk'
+          function Invoke-GodotExport($name, $arguments, $logPrefix) {
+            $stdout = Join-Path $env:RUNNER_TEMP "$logPrefix-stdout.log"
+            $stderr = Join-Path $env:RUNNER_TEMP "$logPrefix-stderr.log"
+            $process = Start-Process -FilePath $env:GODOT_EXE -ArgumentList $arguments -Wait -PassThru `
+              -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+            Write-Output "--- $name output ---"
+            if (Test-Path $stdout) { Get-Content -LiteralPath $stdout }
+            if (Test-Path $stderr) { Get-Content -LiteralPath $stderr }
+            if ($process.ExitCode -ne 0) { throw "$name export failed with exit code $($process.ExitCode)." }
+          }
           Write-Output "Exporting Windows build to $windowsBuild"
-          & $env:GODOT_EXE --headless --path . --export-release 'Windows Desktop' $windowsBuild
-          $windowsExitCode = $LASTEXITCODE
-          Write-Output "Windows export exit code: $windowsExitCode"
-          if ($windowsExitCode -ne 0) { exit $windowsExitCode }
+          $windowsArguments = '--headless --path . --export-release "Windows Desktop" "{0}"' -f $windowsBuild
+          Invoke-GodotExport 'Windows' $windowsArguments 'windows-export'
           if (-not (Test-Path -LiteralPath $windowsBuild -PathType Leaf)) {
             Get-ChildItem -Force -Recurse build | Select-Object FullName, Length | Format-Table -AutoSize
             throw "Godot reported a successful Windows export but did not create $windowsBuild."
           }
           Write-Output "Exporting Android build to $androidBuild"
-          & $env:GODOT_EXE --headless --path . --export-debug 'Android APK' $androidBuild
-          $androidExitCode = $LASTEXITCODE
-          Write-Output "Android export exit code: $androidExitCode"
-          if ($androidExitCode -ne 0) { exit $androidExitCode }
+          $androidArguments = '--headless --path . --export-debug "Android APK" "{0}"' -f $androidBuild
+          Invoke-GodotExport 'Android' $androidArguments 'android-export'
           if (-not (Test-Path -LiteralPath $androidBuild -PathType Leaf)) {
             Get-ChildItem -Force -Recurse build | Select-Object FullName, Length | Format-Table -AutoSize
             throw "Godot reported a successful Android export but did not create $androidBuild."
