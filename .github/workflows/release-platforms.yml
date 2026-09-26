@@ -1,0 +1,197 @@
+name: Build and publish platform releases
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  windows-android:
+    name: Windows and Android
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Godot and export templates
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = '4.7.2-stable'
+          $download = Join-Path $env:RUNNER_TEMP 'godot-download'
+          $engineZip = Join-Path $download 'godot.zip'
+          $templateZip = Join-Path $download 'templates.zip'
+          New-Item -ItemType Directory -Force -Path $download | Out-Null
+          Invoke-WebRequest "https://github.com/godotengine/godot-builds/releases/download/$version/Godot_v${version}_win64.exe.zip" -OutFile $engineZip
+          Invoke-WebRequest "https://github.com/godotengine/godot-builds/releases/download/$version/Godot_v${version}_export_templates.tpz" -OutFile $templateZip
+          Expand-Archive -LiteralPath $engineZip -DestinationPath (Join-Path $download 'engine') -Force
+          Expand-Archive -LiteralPath $templateZip -DestinationPath (Join-Path $download 'templates') -Force
+          $godot = Get-ChildItem (Join-Path $download 'engine') -Filter 'Godot*_win64.exe' -Recurse | Select-Object -First 1 -ExpandProperty FullName
+          if (-not $godot) { throw 'Godot console executable was not found in the downloaded archive.' }
+          "GODOT_EXE=$godot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          $templateSource = Join-Path $download 'templates/templates'
+          if (-not (Test-Path $templateSource)) { $templateSource = Join-Path $download 'templates' }
+          $templateTarget = Join-Path $env:APPDATA 'Godot/export_templates/4.7.2.stable'
+          New-Item -ItemType Directory -Force -Path $templateTarget | Out-Null
+          Copy-Item (Join-Path $templateSource '*') $templateTarget -Recurse -Force
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages and debug signing key
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          sdkmanager --sdk_root="$env:ANDROID_HOME" 'platform-tools' 'platforms;android-35' 'build-tools;35.0.1'
+          $keystore = Join-Path $env:RUNNER_TEMP 'moefive-debug.keystore'
+          keytool -genkeypair -keystore $keystore -storepass android -alias androiddebugkey -keypass android -dname 'CN=Android Debug,O=Android,C=US' -keyalg RSA -keysize 2048 -validity 10000
+          "GODOT_ANDROID_KEYSTORE_DEBUG_PATH=$keystore" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          'GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey' | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          'GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android' | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          $settingsPath = Join-Path $env:APPDATA 'Godot/editor_settings-4.7.tres'
+          New-Item -ItemType Directory -Force -Path (Split-Path $settingsPath) | Out-Null
+          $sdkPath = $env:ANDROID_HOME.Replace('\', '/')
+          $javaPath = $env:JAVA_HOME.Replace('\', '/')
+          @"
+          [gd_resource type="EditorSettings" format=3]
+
+          [resource]
+          export/android/android_sdk_path = "$sdkPath"
+          export/android/java_sdk_path = "$javaPath"
+          export/android/debug_keystore = "$($keystore.Replace('\', '/'))"
+          export/android/debug_keystore_user = "androiddebugkey"
+          export/android/debug_keystore_pass = "android"
+          "@ | Set-Content -LiteralPath $settingsPath -Encoding utf8
+
+      - name: Import and verify project
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & $env:GODOT_EXE --headless --editor --path . --import --quit
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & $env:GODOT_EXE --headless --path . --script res://tests/test_core.gd
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & $env:GODOT_EXE --headless --path . --script res://tests/test_landscape_orientation.gd
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & $env:GODOT_EXE --headless --path . --script res://tests/test_pve_entry.gd
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & $env:GODOT_EXE --headless --path . --script res://tests/test_match_flow.gd
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Export Windows and Android
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path build/windows, build/android | Out-Null
+          & $env:GODOT_EXE --headless --path . --export-release 'Windows Desktop' build/windows/MoeFive-Windows.exe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & $env:GODOT_EXE --headless --path . --export-debug 'Android APK' build/android/MoeFive-Android-debug.apk
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Get-FileHash build/windows/MoeFive-Windows.exe -Algorithm SHA256 | Format-List
+          Get-FileHash build/android/MoeFive-Android-debug.apk -Algorithm SHA256 | Format-List
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-android
+          path: |
+            build/windows/MoeFive-Windows.exe
+            build/android/MoeFive-Android-debug.apk
+          if-no-files-found: error
+
+  macos-ios:
+    name: macOS and iOS Xcode project
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Godot and export templates
+        shell: bash
+        run: |
+          set -euo pipefail
+          version='4.7.2-stable'
+          mkdir -p "$RUNNER_TEMP/godot" "$HOME/Library/Application Support/Godot/export_templates/4.7.2.stable"
+          curl -fL "https://github.com/godotengine/godot-builds/releases/download/$version/Godot_v${version}_macos.universal.zip" -o "$RUNNER_TEMP/godot/engine.zip"
+          curl -fL "https://github.com/godotengine/godot-builds/releases/download/$version/Godot_v${version}-stable_export_templates.tpz" -o "$RUNNER_TEMP/godot/templates.zip"
+          unzip -q "$RUNNER_TEMP/godot/engine.zip" -d "$RUNNER_TEMP/godot/engine"
+          unzip -q "$RUNNER_TEMP/godot/templates.zip" -d "$RUNNER_TEMP/godot/templates"
+          template_source="$RUNNER_TEMP/godot/templates/templates"
+          [[ -d "$template_source" ]] || template_source="$RUNNER_TEMP/godot/templates"
+          cp -R "$template_source"/. "$HOME/Library/Application Support/Godot/export_templates/4.7.2.stable/"
+          godot_app="$(find "$RUNNER_TEMP/godot/engine" -name Godot.app -type d -print -quit)"
+          test -n "$godot_app"
+          echo "GODOT_BIN=$godot_app/Contents/MacOS/Godot" >> "$GITHUB_ENV"
+          chmod +x "$godot_app/Contents/MacOS/Godot"
+
+      - name: Import and verify project
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$GODOT_BIN" --headless --editor --path . --import --quit
+          "$GODOT_BIN" --headless --path . --script res://tests/test_core.gd
+          "$GODOT_BIN" --headless --path . --script res://tests/test_landscape_orientation.gd
+          "$GODOT_BIN" --headless --path . --script res://tests/test_pve_entry.gd
+          "$GODOT_BIN" --headless --path . --script res://tests/test_match_flow.gd
+
+      - name: Export macOS and iOS
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/macos build/ios
+          "$GODOT_BIN" --headless --path . --export-release 'macOS' build/macos/MoeFive-macOS.zip
+          "$GODOT_BIN" --headless --path . --export-release 'iOS Xcode' build/ios
+          # The exporter requires a syntactically valid Team ID to generate the Xcode
+          # project. Remove the placeholder so Xcode prompts the user to choose their
+          # own development team before signing or installing the app.
+          find build/ios -name project.pbxproj -type f -exec sed -i '' 's/DEVELOPMENT_TEAM = MOEFIVE001;/DEVELOPMENT_TEAM = "";/g' {} \;
+          cat > build/ios/README-iOS.txt <<'EOF'
+          MoeFive iOS Xcode project
+
+          This is an unsigned Xcode project, not an installable IPA. Open the .xcodeproj
+          in Xcode, select your Apple development team under Signing & Capabilities,
+          and build to a simulator or device. A paid Apple Developer account and valid
+          signing setup are required for App Store distribution.
+          EOF
+          ditto -c -k --sequesterRsrc --keepParent build/ios build/MoeFive-iOS-Xcode.zip
+          shasum -a 256 build/macos/MoeFive-macOS.zip build/MoeFive-iOS-Xcode.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-ios
+          path: |
+            build/macos/MoeFive-macOS.zip
+            build/MoeFive-iOS-Xcode.zip
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    needs: [windows-android, macos-ios]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Publish release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          name: MoeFive ${{ github.ref_name }}
+          prerelease: true
+          generate_release_notes: true
+          body: |
+            ## Platform builds
+
+            - **Windows:** standalone x86_64 executable.
+            - **Android:** arm64/arm32 debug-signed APK for direct testing; this is not a Google Play signing build.
+            - **macOS:** Universal app ZIP, unsigned and not notarized. macOS may require opening it from Finder with Control-click > Open.
+            - **iOS:** unsigned Xcode project ZIP, not an IPA. Choose your Apple development team in Xcode before installing or archiving.
+
+            All builds are generated with Godot 4.7.2. The game uses landscape orientation and targets a 1920×1080 desktop window.
+          files: release-assets/**
+          fail_on_unmatched_files: true

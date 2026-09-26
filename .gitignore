@@ -12,15 +12,14 @@ __pycache__/
 .godot/
 android/
 export/
-export_presets.cfg
+/build/
 .mono/
 data_*/
 mono_crash.*.json
 
 # 注：`*.import` 不在忽略之列 —— 它是 Godot 的资源导入配置，
 # 属于应当入库的项目数据，忽略它会导致他人克隆后资源导入设置丢失。
-# 注：`export_presets.cfg` 默认忽略 —— 其中含 Android keystore 路径与口令，
-# 若日后需要共享导出配置，请先改用环境变量承载签名口令再解除忽略。
+# `export_presets.cfg` 只保存非敏感的跨平台导出选项；签名材料应使用 CI secrets。
 
 # ===== AI 工作目录（记忆与工具数据，不入库）=====
 .workbuddy/
