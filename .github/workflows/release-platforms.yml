@@ -221,6 +221,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p package-context
+          cp .github/packages/Dockerfile package-context/Dockerfile
           for asset in \
             MoeFive-Windows.exe \
             MoeFive-Android-debug.apk \
@@ -252,7 +253,6 @@ jobs:
           image="ghcr.io/$owner/moefive-builds"
           printf '%s' "$GITHUB_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
           docker buildx build \
-            --file .github/packages/Dockerfile \
             --build-arg "VERSION=${GITHUB_REF_NAME}" \
             --tag "$image:$GITHUB_REF_NAME" \
             --tag "$image:latest" \
