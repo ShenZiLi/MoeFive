@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  packages: write
 
 jobs:
   windows-android:
@@ -214,6 +215,49 @@ jobs:
         with:
           path: release-assets
           merge-multiple: true
+
+      - name: Prepare GitHub Packages bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p package-context
+          for asset in \
+            MoeFive-Windows.exe \
+            MoeFive-Android-debug.apk \
+            MoeFive-macOS.zip \
+            MoeFive-iOS-Xcode.zip; do
+            source="$(find release-assets -type f -name "$asset" -print -quit)"
+            if [[ -z "$source" ]]; then
+              echo "Missing release asset: $asset" >&2
+              exit 1
+            fi
+            cp "$source" "package-context/$asset"
+          done
+          cat > package-context/README-Package.txt <<EOF
+          MoeFive platform release bundle: ${GITHUB_REF_NAME}
+
+          This OCI package contains the same four artifacts as the GitHub Release.
+          For direct downloads, use https://github.com/${GITHUB_REPOSITORY}/releases/tag/${GITHUB_REF_NAME}.
+          Windows and Android files are ready for testing. Android is debug-signed.
+          The macOS ZIP is unsigned. The iOS ZIP contains an Xcode project and requires signing.
+          EOF
+
+      - name: Publish OCI package to GitHub Packages
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          image="ghcr.io/$owner/moefive-builds"
+          printf '%s' "$GITHUB_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          docker buildx build \
+            --file .github/packages/Dockerfile \
+            --build-arg "VERSION=${GITHUB_REF_NAME}" \
+            --tag "$image:$GITHUB_REF_NAME" \
+            --tag "$image:latest" \
+            --push \
+            package-context
 
       - name: Publish release assets
         uses: softprops/action-gh-release@v2
