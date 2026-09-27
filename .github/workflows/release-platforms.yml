@@ -211,6 +211,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: [windows-android, macos-ios]
     steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           path: release-assets
