@@ -1,0 +1,247 @@
+[gd_scene load_steps=18 format=3]
+
+[ext_resource type="Script" path="res://scenes/match/match_view.gd" id="1_script"]
+[ext_resource type="Texture2D" path="res://assets/match/v3/environment/room_base.png" id="2_room"]
+[ext_resource type="Texture2D" path="res://assets/match/v2/ui/title_plaque.png" id="3_title"]
+[ext_resource type="PackedScene" path="res://scenes/match/board_panel.tscn" id="4_board"]
+[ext_resource type="PackedScene" path="res://scenes/match/player_panel_black.tscn" id="5_black"]
+[ext_resource type="PackedScene" path="res://scenes/match/player_panel_white.tscn" id="6_white"]
+[ext_resource type="PackedScene" path="res://scenes/match/action_toolbar.tscn" id="7_actions"]
+[ext_resource type="Texture2D" path="res://assets/match/v3/ui/quote_board_blank.png" id="8_quote"]
+[ext_resource type="Texture2D" path="res://assets/match/decor/plant_left.png" id="9_plant_left"]
+[ext_resource type="Texture2D" path="res://assets/match/v3/decor/left_books.png" id="10_books"]
+[ext_resource type="Texture2D" path="res://assets/match/decor/ball_dog.png" id="11_ball_dog"]
+[ext_resource type="Texture2D" path="res://assets/match/decor/sleeping_cat.png" id="12_sleeping_cat"]
+[ext_resource type="Texture2D" path="res://assets/match/decor/cup.png" id="13_cup"]
+[ext_resource type="Texture2D" path="res://assets/match/v3/decor/right_books.png" id="14_sign"]
+[ext_resource type="Texture2D" path="res://assets/match/decor/plant_right.png" id="15_plant_right"]
+[ext_resource type="Texture2D" path="res://assets/match/board/corner_paw.png" id="16_paw"]
+[ext_resource type="Texture2D" path="res://assets/match/v4/environment/match_full.jpg" id="17_photo"]
+
+[node name="MatchView" type="Control"]
+custom_minimum_size = Vector2(1280, 720)
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+script = ExtResource("1_script")
+
+[node name="Environment" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+texture = ExtResource("2_room")
+expand_mode = 1
+stretch_mode = 6
+
+[node name="PhotoBackground" type="TextureRect" parent="."]
+visible = false
+mouse_filter = 2
+texture = ExtResource("17_photo")
+expand_mode = 1
+stretch_mode = 0
+
+[node name="SafeLayout" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 1
+
+[node name="TitlePlaque" type="TextureRect" parent="SafeLayout"]
+mouse_filter = 2
+texture = ExtResource("3_title")
+expand_mode = 1
+stretch_mode = 0
+
+[node name="Title" type="Label" parent="SafeLayout/TitlePlaque"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 12.0
+offset_top = 22.0
+offset_right = -12.0
+offset_bottom = -35.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.941176, 0.831373, 1)
+theme_override_colors/font_outline_color = Color(0.333333, 0.172549, 0.086275, 1)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 44
+text = "五子棋"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Subtitle" type="Label" parent="SafeLayout/TitlePlaque"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 67.0
+offset_right = -10.0
+offset_bottom = -12.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.352941, 0.227451, 0.133333, 1)
+theme_override_font_sizes/font_size = 14
+text = "以棋会友 · 快乐常在"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="TitlePawLeft" type="TextureRect" parent="SafeLayout/TitlePlaque"]
+offset_left = 14.0
+offset_top = 26.0
+offset_right = 44.0
+offset_bottom = 56.0
+mouse_filter = 2
+texture = ExtResource("16_paw")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="TitlePawRight" type="TextureRect" parent="SafeLayout/TitlePlaque"]
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -44.0
+offset_top = 26.0
+offset_right = -14.0
+offset_bottom = 56.0
+mouse_filter = 2
+texture = ExtResource("16_paw")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="QuoteBoard" type="TextureRect" parent="SafeLayout"]
+mouse_filter = 2
+texture = ExtResource("8_quote")
+expand_mode = 1
+stretch_mode = 0
+
+[node name="Quote" type="Label" parent="SafeLayout/QuoteBoard"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 46.0
+offset_top = 44.0
+offset_right = -30.0
+offset_bottom = -55.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.988235, 0.776471, 0.792157, 1)
+theme_override_font_sizes/font_size = 15
+text = "下好每一步\n遇见更好的自己"
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 2
+
+[node name="QuotePaw" type="TextureRect" parent="SafeLayout/QuoteBoard"]
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -41.0
+offset_top = -34.0
+offset_right = -21.0
+offset_bottom = -14.0
+mouse_filter = 2
+texture = ExtResource("16_paw")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="BoardPanel" parent="SafeLayout" instance=ExtResource("4_board")]
+
+[node name="PlayerPanelBlack" parent="SafeLayout" instance=ExtResource("5_black")]
+
+[node name="PlayerPanelWhite" parent="SafeLayout" instance=ExtResource("6_white")]
+
+[node name="ActionToolbar" parent="SafeLayout" instance=ExtResource("7_actions")]
+
+[node name="PhotoBlackCount" type="Label" parent="SafeLayout"]
+visible = false
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.33, 0.17, 0.08, 1)
+theme_override_colors/font_outline_color = Color(1, 0.88, 0.72, 0.9)
+theme_override_constants/outline_size = 10
+theme_override_font_sizes/font_size = 160
+text = "× 0"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="PhotoWhiteCount" type="Label" parent="SafeLayout"]
+visible = false
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.20, 0.47, 0.65, 1)
+theme_override_colors/font_outline_color = Color(1, 0.94, 0.85, 0.9)
+theme_override_constants/outline_size = 10
+theme_override_font_sizes/font_size = 160
+text = "× 0"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ForegroundDecor" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="PlantLeft" type="TextureRect" parent="ForegroundDecor"]
+mouse_filter = 2
+texture = ExtResource("9_plant_left")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="BooksLeft" type="TextureRect" parent="ForegroundDecor"]
+mouse_filter = 2
+texture = ExtResource("10_books")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="BallDog" type="TextureRect" parent="ForegroundDecor"]
+mouse_filter = 2
+texture = ExtResource("11_ball_dog")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="SleepingCat" type="TextureRect" parent="ForegroundDecor"]
+mouse_filter = 2
+texture = ExtResource("12_sleeping_cat")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Cup" type="TextureRect" parent="ForegroundDecor"]
+mouse_filter = 2
+texture = ExtResource("13_cup")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="BooksRight" type="TextureRect" parent="ForegroundDecor"]
+mouse_filter = 2
+texture = ExtResource("14_sign")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="PlantRight" type="TextureRect" parent="ForegroundDecor"]
+mouse_filter = 2
+texture = ExtResource("15_plant_right")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="StatusPlate" type="Panel" parent="."]
+layout_mode = 0
+mouse_filter = 2
+
+[node name="StatusMessage" type="Label" parent="."]
+layout_mode = 0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.352941, 0.227451, 0.133333, 1)
+theme_override_font_sizes/font_size = 16
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="FeedbackTimer" type="Timer" parent="."]
+one_shot = true
